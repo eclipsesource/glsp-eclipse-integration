@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import org.eclipse.glsp.ide.editor.GLSPDiagramEditorPart;
 import org.eclipse.glsp.ide.editor.ui.GLSPEditorIntegrationPlugin;
 import org.eclipse.glsp.server.actions.Action;
+import org.eclipse.glsp.server.actions.InitializeClientSessionAction;
 import org.eclipse.glsp.server.actions.ServerMessageAction;
 import org.eclipse.glsp.server.actions.ServerStatusAction;
 import org.eclipse.glsp.server.actions.SetDirtyStateAction;
@@ -31,8 +32,12 @@ import org.eclipse.glsp.server.protocol.ClientSessionManager;
 import org.eclipse.glsp.server.protocol.GLSPServerException;
 
 import com.google.inject.Inject;
+import com.google.inject.Injector;
 
 public class EclipseEditorActionDispatcher extends DefaultActionDispatcher {
+
+   @Inject
+   private Injector injector;
 
    @Inject
    public EclipseEditorActionDispatcher(final ClientSessionManager clientSessionManager) {
@@ -48,7 +53,9 @@ public class EclipseEditorActionDispatcher extends DefaultActionDispatcher {
    }
 
    protected boolean handleLocally(final Action action, final String clientId) {
-      if (action instanceof ServerMessageAction) {
+      if (action instanceof InitializeClientSessionAction) {
+         return handleInitializeClientSession((InitializeClientSessionAction) action, clientId);
+      } else if (action instanceof ServerMessageAction) {
          return handleServerMessageAction((ServerMessageAction) action, clientId);
       } else if (action instanceof ServerStatusAction) {
          return handleServerStatusAction((ServerStatusAction) action, clientId);
@@ -57,6 +64,13 @@ public class EclipseEditorActionDispatcher extends DefaultActionDispatcher {
       } else if (action instanceof RequestContextActions) {
          return handleRequestContextActions((RequestContextActions) action, clientId);
       }
+      return false;
+   }
+
+   private boolean handleInitializeClientSession(final InitializeClientSessionAction action, final String clientId) {
+      // Associate the injection context with the EditorPart (which is created before the Injector; so
+      // it needs to know about it).
+      getEditorPart(clientId).setInjector(injector);
       return false;
    }
 
@@ -81,8 +95,8 @@ public class EclipseEditorActionDispatcher extends DefaultActionDispatcher {
    }
 
    protected GLSPDiagramEditorPart getEditorPart(final String clientId) {
-      return GLSPServerException.getOrThrow(GLSPEditorIntegrationPlugin.getDefault().getGLSPEditorRegistry()
-         .getGLSPEditor(clientId),
+      return GLSPServerException.getOrThrow(
+         GLSPEditorIntegrationPlugin.getDefault().getGLSPEditorRegistry().getGLSPEditor(clientId),
          "Could not retrieve GLSP Editor. GLSP editor is not properly configured for clientId: " + clientId);
    }
 
