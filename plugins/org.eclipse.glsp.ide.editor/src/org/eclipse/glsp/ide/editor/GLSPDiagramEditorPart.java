@@ -48,6 +48,8 @@ import org.eclipse.swt.events.ControlAdapter;
 import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseTrackAdapter;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -57,6 +59,7 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Menu;
+import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorSite;
 import org.eclipse.ui.IFileEditorInput;
@@ -88,6 +91,7 @@ public class GLSPDiagramEditorPart extends EditorPart {
    private boolean dirty;
 
    private boolean connected;
+   private boolean chromiumOnWindows;
 
    public GLSPDiagramEditorPart() {}
 
@@ -101,7 +105,24 @@ public class GLSPDiagramEditorPart extends EditorPart {
       return serverManager.get();
    }
 
-   public Optional<GLSPActionProvider> getActionProvider() { return Optional.empty(); }
+   public Optional<GLSPActionProvider> getActionProvider() {
+      return Optional.of((menu, modelState, editorContext, index) -> {
+         editorContext.getSelectedElementIds().stream()
+            .map(id -> modelState.getIndex().get(id))//
+            .filter(Optional::isPresent).map(Optional::get)//
+            .forEach(e -> {
+               MenuItem menuItem = new MenuItem(menu, SWT.PUSH);
+               menuItem.setText(e.getType() + " " + e.getId());
+               menuItem.addSelectionListener(new SelectionAdapter() {
+                  @Override
+                  public void widgetSelected(final SelectionEvent e) {
+                     System.err.println("selected element " + menuItem.getText());
+                  }
+               });
+            });
+
+      });
+   }
 
    public String getEditorId() { return getConfigurationElement().getAttribute("id"); }
 
@@ -166,6 +187,7 @@ public class GLSPDiagramEditorPart extends EditorPart {
       comp.setLayout(new GridLayout(1, true));
 
       browser = createBrowser(comp);
+      chromiumOnWindows = "win32".equals(SWT.getPlatform()) && SWT.CHROMIUM == (browser.getStyle() & SWT.CHROMIUM);
       browser.setLayoutData(new GridData(GridData.FILL, GridData.FILL, true, true));
       Browser.clearSessions();
       browser.refresh();
@@ -219,6 +241,9 @@ public class GLSPDiagramEditorPart extends EditorPart {
    }
 
    protected Browser createBrowser(final Composite parent) {
+      if ("win32".equals(SWT.getPlatform())) {
+         return new Browser(comp, SWT.CHROMIUM);
+      }
       return new Browser(comp, SWT.NO_SCROLL);
    }
 
@@ -321,7 +346,12 @@ public class GLSPDiagramEditorPart extends EditorPart {
       }
       // Update the EditorContext, as this is specific to each action.
       getSite().getService(IEclipseContext.class).set(EditorContext.class, action.getEditorContext());
-      // Nothing more to do here; populating & opening the menu will be handled directly
+      // Usually nothing more to do here; populating & opening the menu will be handled directly
       // by the browser control.
+      if (chromiumOnWindows) {
+         browser.getDisplay().asyncExec(() -> {
+            browser.getMenu().setVisible(true);
+         });
+      }
    }
 }
