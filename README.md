@@ -1,3 +1,4 @@
+# **!!! This repository is discontinued. This project has moved to [eclipse-glsp](https://github.com/eclipse-glsp/glsp) and will be maintained there !!!**
 # Eclipse GLSP Eclipse IDE Integration
 
 Contains the glue code for opening browser-based GLSP diagrams in an Eclipse IDE Editor
